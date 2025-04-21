@@ -137,8 +137,8 @@ def page_2():
         end_chat = st.button("대화 종료 및 저장")
 
     if send and user_input.strip():
-    assistant_response = get_chatgpt_response(user_input, uploaded_image)
-    st.rerun()  # 여기서만 새로고침! 입력창 초기화는 하지 않음
+        assistant_response = get_chatgpt_response(user_input, uploaded_image)
+        st.rerun()  # 여기서만 새로고침! 입력창 초기화는 하지 않음
 
     if end_chat:
         save_to_db()
