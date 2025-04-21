@@ -66,26 +66,13 @@ def save_to_db():
         return False
 
 # GPT 응답 함수
-def get_chatgpt_response(prompt, uploaded_image=None):
+def get_chatgpt_response(prompt):
     messages = [{"role": "system", "content": initial_prompt}] + st.session_state["messages"]
 
-    if uploaded_image is not None:
-        image_bytes = uploaded_image.read()
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=messages + [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image", "image": image_bytes}
-                ]
-            }]
-        )
-    else:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=messages + [{"role": "user", "content": prompt}]
-        )
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages + [{"role": "user", "content": prompt}]
+    )
 
     answer = response.choices[0].message.content
 
@@ -116,7 +103,7 @@ def page_2():
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    # 누적 대화 출력 (최근 대화가 위로)
+    # 누적 대화 출력
     st.subheader("📜 대화 기록")
     for message in reversed(st.session_state["messages"]):
         if message["role"] == "user":
@@ -126,8 +113,13 @@ def page_2():
 
     st.divider()
 
-    # 입력창 및 파일 업로드
+    # 업로드 UI
     uploaded_image = st.file_uploader("화면 캡처 파일 업로드 (선택)", type=["png", "jpg", "jpeg"])
+
+    if uploaded_image is not None:
+        st.image(uploaded_image, caption="업로드한 캡처", use_column_width=True)
+
+    # 질문 입력
     user_input = st.text_area("질문 입력", key="user_input")
 
     col1, col2 = st.columns([3,1])
@@ -137,8 +129,8 @@ def page_2():
         end_chat = st.button("대화 종료 및 저장")
 
     if send and user_input.strip():
-        assistant_response = get_chatgpt_response(user_input, uploaded_image)
-        st.rerun()  # 여기서만 새로고침! 입력창 초기화는 하지 않음
+        assistant_response = get_chatgpt_response(user_input)
+        st.rerun()
 
     if end_chat:
         save_to_db()
