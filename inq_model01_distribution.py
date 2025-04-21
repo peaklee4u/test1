@@ -138,7 +138,7 @@ def page_2():
 
     if send and user_input.strip():
         assistant_response = get_chatgpt_response(user_input, uploaded_image)
-        st.session_state["user_input"] = ""
+        st.session_state.update({"user_input": ""})
         st.rerun()
 
     if end_chat:
