@@ -81,8 +81,8 @@ def save_to_db(all_data):
         now = datetime.now()
 
         sql = """
-        INSERT INTO qna (number, name, chat, time)
-        VALUES (%s, %s, %s, %s)
+            INSERT INTO qna (number, name, chat, time)
+            VALUES (%s, %s, %s, %s)
         """
         chat = json.dumps(all_data, ensure_ascii=False)
         val = (number, name, chat, now)
