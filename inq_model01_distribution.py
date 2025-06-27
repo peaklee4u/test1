@@ -289,8 +289,8 @@ def save_to_db(all_data):
         now = datetime.now()
 
         sql = """
-        INSERT INTO qna (number, name, chat, time)
-        VALUES (%s, %s, %s, %s)
+            INSERT INTO qna (number, name, chat, time)
+            VALUES (%s, %s, %s, %s)
         """
         # all_data를 JSON 문자열로 변환하여 저장
         chat = json.dumps(all_data, ensure_ascii=False)  # 대화 및 피드백 내용 통합
@@ -472,8 +472,8 @@ def save_feedback_to_db(feedback):
         now = datetime.now()
 
         sql = """
-        INSERT INTO feedback (number, name, feedback, time)
-        VALUES (%s, %s, %s, %s)
+            INSERT INTO feedback (number, name, feedback, time)
+            VALUES (%s, %s, %s, %s)
         """
         val = (number, name, feedback, now)
 
