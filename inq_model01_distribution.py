@@ -138,48 +138,83 @@ def page_2():
 # Page 3: Chat interface with optional image upload
 def page_3():
     st.title("탐구 도우미 활용하기")
+    st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
 
+    # 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    text_input = st.text_area("질문을 입력하세요:")
+    if "user_input" not in st.session_state:
+        st.session_state["user_input"] = ""
+
+    # 입력창: 텍스트
+    user_input = st.text_area("질문을 입력하세요:", value=st.session_state["user_input"], key="user_input_area")
+
+    # 입력창: 이미지 (선택사항)
     uploaded_image = st.file_uploader("참고 이미지(선택사항)를 업로드하세요:", type=["png", "jpg", "jpeg"])
 
+    # 전송 버튼
     if st.button("전송"):
-        if not text_input.strip() and not uploaded_image:
+        if not user_input.strip() and not uploaded_image:
             st.warning("텍스트나 이미지를 입력해주세요.")
-            return
-
-        if uploaded_image:
-            image_data = encode_image(uploaded_image)
-            content = [
-                {"type": "text", "text": text_input},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_data}"}}
-            ]
         else:
-            content = text_input
+            # 입력내용 구성
+            if uploaded_image:
+                base64_img = encode_image(uploaded_image)
+                content = [
+                    {"type": "text", "text": user_input},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}
+                ]
+            else:
+                content = user_input
 
-        st.session_state["messages"].append({"role": "user", "content": content})
-        answer = get_chatgpt_response(content)
+            # 메시지 추가 및 응답
+            st.session_state["messages"].append({"role": "user", "content": content})
+            answer = get_chatgpt_response(content)
+            st.session_state["messages"].append({"role": "assistant", "content": answer})
 
-        st.markdown("### 📌 최근 대화")
-        st.write(f"**You:** {text_input}")
-        st.write(f"**과학탐구 도우미:** {answer}")
+            # 입력창 초기화
+            st.session_state["user_input"] = ""
 
-    st.markdown("### 📜 누적 대화")
+            st.rerun()
+
+    # 최근 대화 출력
+    if st.session_state["messages"]:
+        st.subheader("📌 최근 대화")
+        last_messages = st.session_state["messages"][-2:]  # 사용자-응답 페어
+        for msg in last_messages:
+            if msg["role"] == "user":
+                st.markdown("**You:**")
+                if isinstance(msg["content"], list):
+                    for part in msg["content"]:
+                        if part["type"] == "text":
+                            st.write(part["text"])
+                        elif part["type"] == "image_url":
+                            st.image(part["image_url"]["url"], caption="업로드한 이미지")
+                else:
+                    st.write(msg["content"])
+            elif msg["role"] == "assistant":
+                st.markdown("**과학탐구 도우미:**")
+                st.write(msg["content"])
+
+    # 전체 대화 출력
+    st.subheader("📜 누적 대화")
     for msg in st.session_state["messages"]:
         if msg["role"] == "user":
+            st.markdown("**You:**")
             if isinstance(msg["content"], list):
                 for part in msg["content"]:
                     if part["type"] == "text":
-                        st.write(f"**You:** {part['text']}")
+                        st.write(part["text"])
                     elif part["type"] == "image_url":
                         st.image(part["image_url"]["url"], caption="업로드한 이미지")
             else:
-                st.write(f"**You:** {msg['content']}")
+                st.write(msg["content"])
         elif msg["role"] == "assistant":
-            st.write(f"**과학탐구 도우미:** {msg['content']}")
+            st.markdown("**과학탐구 도우미:**")
+            st.write(msg["content"])
 
+    # 다음 단계로 이동
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
