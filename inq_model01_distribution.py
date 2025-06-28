@@ -215,12 +215,6 @@ def page_3():
     if "clear_input" not in st.session_state:
         st.session_state["clear_input"] = False
 
-    # PDF 업로드 및 텍스트 추출
-    pdf_file = st.file_uploader("참고할 PDF 파일을 업로드하세요 (선택사항):", type=["pdf"])
-    if pdf_file and "pdf_text" not in st.session_state:
-        st.session_state["pdf_text"] = extract_pdf_text(pdf_file)
-        st.success("PDF에서 텍스트를 성공적으로 불러왔어요!")
-
     # 입력창: 텍스트
     if st.session_state["clear_input"]:
         user_input = st.text_area("질문을 입력하세요:", value="", key="user_input_area")
@@ -228,31 +222,44 @@ def page_3():
     else:
         user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
-    # 이미지 업로드 (선택사항)
-    uploaded_image = st.file_uploader("참고 이미지(선택사항)를 업로드하세요:", type=["png", "jpg", "jpeg"])
+    # 파일 업로드: PDF 또는 이미지
+    uploaded_file = st.file_uploader("📎 참고할 PDF 또는 이미지 파일을 업로드하세요:", type=["pdf", "png", "jpg", "jpeg"])
+
+    # 파일 처리 결과
+    extracted_pdf_text = None
+    encoded_image = None
+
+    if uploaded_file:
+        if uploaded_file.type == "application/pdf":
+            extracted_pdf_text = extract_pdf_text(uploaded_file)
+            st.success("✅ PDF 문서를 성공적으로 불러왔어요!")
+        elif uploaded_file.type.startswith("image/"):
+            encoded_image = encode_image(uploaded_file)
+            st.image(uploaded_file, caption="업로드한 이미지")
+        else:
+            st.warning("지원하지 않는 파일 형식입니다.")
 
     # 전송 버튼
     if st.button("전송"):
-        if not user_input.strip() and not uploaded_image:
-            st.warning("텍스트나 이미지를 입력해주세요.")
+        if not user_input.strip() and not uploaded_file:
+            st.warning("텍스트나 파일을 입력해주세요.")
         else:
-            # 입력내용 구성
-            if uploaded_image:
-                base64_img = encode_image(uploaded_image)
-                content = [
-                    {"type": "text", "text": user_input},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}
-                ]
-            else:
-                content = user_input
+            # 메시지 content 구성
+            content = []
+            if user_input.strip():
+                content.append({"type": "text", "text": user_input})
 
-            # 📘 시스템 프롬프트에 PDF 내용 포함 (필요할 때만)
-            if "pdf_text" in st.session_state:
-                pdf_context = st.session_state["pdf_text"][:1500]  # 너무 길면 자릅니다
+            if encoded_image:
+                content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}})
+            elif extracted_pdf_text:
+                # system 메시지로 PDF 요약 포함
                 st.session_state["messages"].append({
                     "role": "system",
-                    "content": f"참고 문서 내용:\n{pdf_context}"
+                    "content": f"학생이 참고한 PDF 문서의 주요 내용입니다:\n\n{extracted_pdf_text[:1500]}"
                 })
+
+            if len(content) == 1:
+                content = content[0]  # 단일 텍스트/이미지만 있을 경우 list 아님
 
             # 메시지 추가 및 응답
             st.session_state["messages"].append({"role": "user", "content": content})
@@ -280,7 +287,7 @@ def page_3():
                 st.markdown("**과학탐구 도우미:**")
                 st.write(msg["content"])
 
-    # 전체 대화 출력
+    # 누적 대화 출력
     st.subheader("📜 누적 대화")
     for msg in st.session_state["messages"]:
         if msg["role"] == "user":
@@ -297,10 +304,10 @@ def page_3():
             st.markdown("**과학탐구 도우미:**")
             st.write(msg["content"])
 
+    # 다음 단계로 이동
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
-
 
 
 # Page 4: Save and summarize
