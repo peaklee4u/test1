@@ -102,18 +102,20 @@ initial_prompt = (
 def encode_image(uploaded_file):
     return base64.b64encode(uploaded_file.read()).decode("utf-8")
 
-# Generate response from OpenAI
-def get_chatgpt_response(content):
-    messages = [{"role": "system", "content": initial_prompt}] + st.session_state["messages"]
-
-    # 멀티모달: gpt-4o만 지원
-    if isinstance(content, list):
-        if MODEL != "gpt-4o":
-            st.error("이미지와 함께 질문하려면 GPT-4o 모델이 필요합니다.")
-            return
-        messages.append({"role": "user", "content": content})
-    else:
-        messages.append({"role": "user", "content": content})
+# Generate response from OpenAI - 수정된 함수
+def get_chatgpt_response(content, pdf_context=None):
+    # 시스템 프롬프트와 기존 대화 기록으로 메시지 구성
+    messages = [{"role": "system", "content": initial_prompt}]
+    
+    # PDF 컨텍스트가 있으면 추가
+    if pdf_context:
+        messages.append({"role": "system", "content": f"학생이 참고한 PDF 문서 내용입니다:\n\n{pdf_context[:1500]}"})
+    
+    # 기존 대화 기록 추가
+    messages.extend(st.session_state["messages"])
+    
+    # 현재 사용자 입력 추가
+    messages.append({"role": "user", "content": content})
 
     try:
         response = client.chat.completions.create(
@@ -121,7 +123,11 @@ def get_chatgpt_response(content):
             messages=messages
         )
         answer = response.choices[0].message.content
+        
+        # 세션에 메시지들 저장
+        st.session_state["messages"].append({"role": "user", "content": content})
         st.session_state["messages"].append({"role": "assistant", "content": answer})
+        
         return answer
     except Exception as e:
         st.error(f"❌ ChatGPT 응답 오류: {e}")
@@ -177,8 +183,6 @@ def extract_pdf_text(file):
     return text
 
 
-
-
 # Page 1: User info input
 def page_1():
     st.title("과학탐구 도우미")
@@ -220,8 +224,7 @@ def page_2():
         st.rerun()
 
 
-# Page 3: Chat interface with optional image upload
-
+# Page 3: Chat interface with optional image upload - 수정된 함수
 def page_3():
     st.title("탐구 도우미 활용하기")
     st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
@@ -230,15 +233,8 @@ def page_3():
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    if "clear_input" not in st.session_state:
-        st.session_state["clear_input"] = False
-
-    # 입력창
-    if st.session_state["clear_input"]:
-        user_input = st.text_area("질문을 입력하세요:", value="", key="user_input_area")
-        st.session_state["clear_input"] = False
-    else:
-        user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
+    # 입력창 - key를 사용하여 고유하게 관리
+    user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
     # 파일 업로드
     uploaded_file = st.file_uploader("📎 참고할 PDF 또는 이미지 파일을 업로드하세요:", type=["pdf", "png", "jpg", "jpeg"])
@@ -257,107 +253,108 @@ def page_3():
             st.warning("지원하지 않는 파일 형식입니다.")
 
     # 전송 버튼
-    if st.button("전송"):
+    if st.button("전송", key="send_button"):
         if not user_input.strip() and not uploaded_file:
             st.warning("텍스트나 파일을 입력해주세요.")
             return
 
-        content = []
-        if user_input.strip():
-            content.append({"type": "text", "text": user_input})
-
+        # 콘텐츠 구성
         if encoded_image:
+            # 이미지가 있는 경우 멀티모달 형식
+            content = []
+            if user_input.strip():
+                content.append({"type": "text", "text": user_input})
             content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}})
-        elif extracted_pdf_text:
-            st.session_state["messages"].append({
-                "role": "system",
-                "content": f"학생이 참고한 PDF 문서 내용입니다:\n\n{extracted_pdf_text[:1500]}"
-            })
+        else:
+            # 텍스트만 있는 경우
+            content = user_input
 
-        if len(content) == 1:
-            content = content[0]
+        # API 호출
+        response = get_chatgpt_response(content, extracted_pdf_text)
+        
+        if response:
+            st.rerun()  # 응답 후 페이지 새로고침
 
-        st.session_state["messages"].append({"role": "user", "content": content})
-        get_chatgpt_response(content)
-        st.session_state["clear_input"] = True
-        st.rerun()
-
-    # 최근 대화
+    # 최근 대화 표시
     if st.session_state["messages"]:
         st.subheader("📌 최근 대화")
-        for msg in st.session_state["messages"][-2:]:
+        # 최근 2개 메시지만 표시
+        recent_messages = st.session_state["messages"][-4:]  # 사용자 + 어시스턴트 각각 최대 2개씩
+        
+        for msg in recent_messages:
             if msg["role"] == "user":
                 st.markdown("**You:**")
-                content = msg["content"]
-                if isinstance(content, list):
-                    for part in content:
-                        if part.get("type") == "text":
-                            st.write(part.get("text", ""))
-                        elif part.get("type") == "image_url":
-                            st.image(part["image_url"]["url"], caption="업로드한 이미지")
-                elif isinstance(content, dict):
-                    if content.get("type") == "text":
-                        st.write(content.get("text", ""))
-                    elif content.get("type") == "image_url":
-                        st.image(content["image_url"]["url"], caption="업로드한 이미지")
-                else:
-                    st.write(content)
+                display_content(msg["content"])
             elif msg["role"] == "assistant":
                 st.markdown("**과학탐구 도우미:**")
                 st.write(msg["content"])
 
     # 누적 대화
-    st.subheader("📜 누적 대화")
-    for msg in st.session_state["messages"]:
-        if msg["role"] == "user":
-            st.markdown("**You:**")
-            content = msg["content"]
-            if isinstance(content, list):
-                for part in content:
-                    if part.get("type") == "text":
-                        st.write(part.get("text", ""))
-                    elif part.get("type") == "image_url":
-                        st.image(part["image_url"]["url"], caption="업로드한 이미지")
-            elif isinstance(content, dict):
-                if content.get("type") == "text":
-                    st.write(content.get("text", ""))
-                elif content.get("type") == "image_url":
-                    st.image(content["image_url"]["url"], caption="업로드한 이미지")
-            else:
-                st.write(content)
-        elif msg["role"] == "assistant":
-            st.markdown("**과학탐구 도우미:**")
-            st.write(msg["content"])
+    if len(st.session_state["messages"]) > 4:
+        with st.expander("📜 전체 대화 보기"):
+            for msg in st.session_state["messages"]:
+                if msg["role"] == "user":
+                    st.markdown("**You:**")
+                    display_content(msg["content"])
+                elif msg["role"] == "assistant":
+                    st.markdown("**과학탐구 도우미:**")
+                    st.write(msg["content"])
 
     # 다음 단계로 이동
-    if st.button("다음"):
+    if st.button("다음", key="next_step_button"):
         st.session_state["step"] = 4
         st.rerun()
 
+# 콘텐츠 표시 헬퍼 함수
+def display_content(content):
+    if isinstance(content, list):
+        for part in content:
+            if part.get("type") == "text":
+                st.write(part.get("text", ""))
+            elif part.get("type") == "image_url":
+                st.image(part["image_url"]["url"], caption="업로드한 이미지")
+    elif isinstance(content, dict):
+        if content.get("type") == "text":
+            st.write(content.get("text", ""))
+        elif content.get("type") == "image_url":
+            st.image(content["image_url"]["url"], caption="업로드한 이미지")
+    else:
+        st.write(content)
 
 
 # Page 4: Save and summarize
 def page_4():
     st.title("탐구 도우미의 제안")
-    if not st.session_state.get("summary_generated"):
-        chat_history = "\n".join(
-            json.dumps(m, ensure_ascii=False) for m in st.session_state["messages"]
-        )
-        prompt = f"학생과의 대화 기록: {chat_history}\n\n위 대화를 요약하고 피드백을 제공하세요."
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": prompt}]
-        )
-        summary = response.choices[0].message.content
-        st.session_state["summary"] = summary
-        st.session_state["summary_generated"] = True
-        save_to_db(st.session_state["messages"] + [{"role": "assistant", "content": summary}])
+    
+    if not st.session_state.get("summary_generated", False):
+        try:
+            chat_history = "\n".join(
+                json.dumps(m, ensure_ascii=False) for m in st.session_state["messages"]
+            )
+            prompt = f"학생과의 대화 기록: {chat_history}\n\n위 대화를 요약하고 피드백을 제공하세요."
+            
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "system", "content": prompt}]
+            )
+            summary = response.choices[0].message.content
+            st.session_state["summary"] = summary
+            st.session_state["summary_generated"] = True
+            
+            # 데이터베이스에 저장
+            save_to_db(st.session_state["messages"] + [{"role": "assistant", "content": summary}])
+            
+        except Exception as e:
+            st.error(f"요약 생성 중 오류가 발생했습니다: {e}")
+            st.session_state["summary"] = "요약을 생성할 수 없습니다."
 
     st.write(st.session_state.get("summary", "요약 없음"))
 
     if st.button("처음으로"):
-        st.session_state.clear()
-        st.experimental_rerun()
+        # 세션 초기화
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
 # Main logic
 if "step" not in st.session_state:
@@ -371,6 +368,3 @@ elif st.session_state["step"] == 3:
     page_3()
 elif st.session_state["step"] == 4:
     page_4()
-
-
-
