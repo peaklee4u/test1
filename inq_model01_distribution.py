@@ -199,8 +199,16 @@ def page_3():
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
+    # 초기화 플래그
+    if "clear_input" not in st.session_state:
+        st.session_state["clear_input"] = False
+
     # 입력창: 텍스트
-    user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
+    if st.session_state["clear_input"]:
+        user_input = st.text_area("질문을 입력하세요:", value="", key="user_input_area")
+        st.session_state["clear_input"] = False
+    else:
+        user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
     # 입력창: 이미지 (선택사항)
     uploaded_image = st.file_uploader("참고 이미지(선택사항)를 업로드하세요:", type=["png", "jpg", "jpeg"])
@@ -222,12 +230,12 @@ def page_3():
 
             # 메시지 추가 및 응답
             st.session_state["messages"].append({"role": "user", "content": content})
-            answer = get_chatgpt_response(content)
+            get_chatgpt_response(content)
 
-            # 👉 입력창 비우기
-            st.session_state["user_input_area"] = ""
+            # 👉 입력창 초기화용 플래그 설정
+            st.session_state["clear_input"] = True
 
-            # 화면 갱신
+            # 리렌더링
             st.rerun()
 
     # 최근 대화 출력
@@ -270,7 +278,6 @@ def page_3():
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
-
 
 # Page 4: Save and summarize
 def page_4():
