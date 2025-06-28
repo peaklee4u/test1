@@ -104,19 +104,17 @@ def encode_image(uploaded_file):
 
 # Generate response from OpenAI
 def get_chatgpt_response(content):
-    # 메시지 쌓기
     messages = [{"role": "system", "content": initial_prompt}] + st.session_state["messages"]
 
-    # content가 list일 경우: 멀티모달 메시지 (text + image)
+    # 멀티모달: gpt-4o만 지원
     if isinstance(content, list):
         if MODEL != "gpt-4o":
-            st.error("이미지와 함께 질문하려면 모델을 'gpt-4o'로 설정해야 합니다.")
-            return None
+            st.error("이미지와 함께 질문하려면 GPT-4o 모델이 필요합니다.")
+            return
         messages.append({"role": "user", "content": content})
     else:
         messages.append({"role": "user", "content": content})
 
-    # GPT 호출
     try:
         response = client.chat.completions.create(
             model=MODEL,
@@ -125,9 +123,8 @@ def get_chatgpt_response(content):
         answer = response.choices[0].message.content
         st.session_state["messages"].append({"role": "assistant", "content": answer})
         return answer
-
-    except openai.BadRequestError as e:
-        st.error("OpenAI 요청 오류: 메시지 형식 또는 데이터가 잘못됐습니다.")
+    except Exception as e:
+        st.error(f"❌ ChatGPT 응답 오류: {e}")
         return None
      
 
@@ -229,7 +226,7 @@ def page_3():
     st.title("탐구 도우미 활용하기")
     st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
 
-    # 세션 상태 초기화
+    # 세션 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
@@ -243,7 +240,7 @@ def page_3():
     else:
         user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
-    # 파일 업로더: PDF 또는 이미지
+    # 파일 업로드
     uploaded_file = st.file_uploader("📎 참고할 PDF 또는 이미지 파일을 업로드하세요:", type=["pdf", "png", "jpg", "jpeg"])
 
     extracted_pdf_text = None
@@ -278,18 +275,17 @@ def page_3():
             })
 
         if len(content) == 1:
-            content = content[0]  # 단일 텍스트만 있는 경우
+            content = content[0]
 
         st.session_state["messages"].append({"role": "user", "content": content})
         get_chatgpt_response(content)
         st.session_state["clear_input"] = True
         st.rerun()
 
-    # 최근 대화 출력
+    # 최근 대화
     if st.session_state["messages"]:
         st.subheader("📌 최근 대화")
-        recent_msgs = st.session_state["messages"][-2:]
-        for msg in recent_msgs:
+        for msg in st.session_state["messages"][-2:]:
             if msg["role"] == "user":
                 st.markdown("**You:**")
                 content = msg["content"]
@@ -310,7 +306,7 @@ def page_3():
                 st.markdown("**과학탐구 도우미:**")
                 st.write(msg["content"])
 
-    # 전체 대화 출력
+    # 누적 대화
     st.subheader("📜 누적 대화")
     for msg in st.session_state["messages"]:
         if msg["role"] == "user":
@@ -333,11 +329,10 @@ def page_3():
             st.markdown("**과학탐구 도우미:**")
             st.write(msg["content"])
 
-    # 다음 버튼
+    # 다음 단계로 이동
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
-
 
 
 
