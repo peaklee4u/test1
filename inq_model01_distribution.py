@@ -220,13 +220,13 @@ def page_3():
                 content = user_input
 
             # 메시지 추가 및 응답
-#           st.session_state["messages"].append({"role": "user", "content": content})
+            st.session_state["messages"].append({"role": "user", "content": content})
             answer = get_chatgpt_response(content)
-#           st.session_state["messages"].append({"role": "assistant", "content": answer})
 
             # 입력창 초기화
             st.session_state["user_input"] = ""
 
+            # 화면 갱신
             st.rerun()
 
     # 최근 대화 출력
