@@ -1,6 +1,7 @@
 # Streamlit-based chatbot with image upload capability for scientific inquiry support
 import streamlit as st
 from openai import OpenAI
+import openai
 import os
 import json
 from datetime import datetime
