@@ -192,14 +192,18 @@ def display_content(content):
             if part.get("type") == "text":
                 st.write(part.get("text", ""))
             elif part.get("type") == "image_url":
-                st.image(part["image_url"]["url"], caption="업로드한 이미지")
+                st.image(part["image_url"]["url"], caption="업로드한 이미지", width=300)
     elif isinstance(content, dict):
         if content.get("type") == "text":
             st.write(content.get("text", ""))
         elif content.get("type") == "image_url":
-            st.image(content["image_url"]["url"], caption="업로드한 이미지")
+            st.image(content["image_url"]["url"], caption="업로드한 이미지", width=300)
     else:
-        st.write(content)
+        # 문자열이고 base64 데이터가 포함된 경우 체크
+        if isinstance(content, str) and "data:image" in content:
+            st.write("📷 이미지가 업로드되었습니다.")
+        else:
+            st.write(content)
 
 
 # Page 1: User info input
@@ -288,7 +292,7 @@ def page_3():
             st.warning("지원하지 않는 파일 형식입니다.")
 
     # Form submit 처리
-    if submit_button and user_input.strip():
+    if submit_button and (user_input.strip() or uploaded_file):
         # 콘텐츠 구성
         if encoded_image:
             # 이미지가 있는 경우 멀티모달 형식
@@ -296,9 +300,12 @@ def page_3():
             if user_input.strip():
                 content.append({"type": "text", "text": user_input})
             content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}})
-        else:
+        elif user_input.strip():
             # 텍스트만 있는 경우
             content = user_input
+        else:
+            st.warning("텍스트나 이미지를 입력해주세요.")
+            return
 
         # API 호출
         response = get_chatgpt_response(content, extracted_pdf_text)
@@ -309,8 +316,15 @@ def page_3():
     # 최근 대화 표시
     st.subheader("📌 최근 대화")
     if st.session_state["recent_message"]["user"] or st.session_state["recent_message"]["assistant"]:
-        st.write(f"**You:** {st.session_state['recent_message']['user']}")
-        st.write(f"**과학탐구 도우미:** {st.session_state['recent_message']['assistant']}")
+        # 사용자 메시지 표시
+        if st.session_state["recent_message"]["user"]:
+            st.write("**You:**")
+            display_content(st.session_state["recent_message"]["user"])
+        
+        # 어시스턴트 메시지 표시
+        if st.session_state["recent_message"]["assistant"]:
+            st.write("**과학탐구 도우미:**")
+            st.write(st.session_state["recent_message"]["assistant"])
     else:
         st.write("아직 최근 대화가 없습니다.")
 
@@ -319,9 +333,11 @@ def page_3():
     if st.session_state["messages"]:
         for message in st.session_state["messages"]:
             if message["role"] == "user":
-                st.write(f"**You:** {message['content']}")
+                st.write("**You:**")
+                display_content(message["content"])
             elif message["role"] == "assistant":
-                st.write(f"**과학탐구 도우미:** {message['content']}")
+                st.write("**과학탐구 도우미:**")
+                st.write(message["content"])
     else:
         st.write("아직 대화 기록이 없습니다.")
 
