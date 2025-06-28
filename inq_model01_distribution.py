@@ -202,6 +202,9 @@ def page_3():
     if "user_input" not in st.session_state:
         st.session_state["user_input"] = ""
 
+     if "recent_message" not in st.session_state:
+        st.session_state["recent_message"] = {"user": "", "assistant": ""}
+    
     # 입력창: 텍스트
     user_input = st.text_area("질문을 입력하세요:", value=st.session_state["user_input"], key="user_input_area")
 
