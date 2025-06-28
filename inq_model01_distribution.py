@@ -7,7 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import base64
 import pymysql
-
+ 
 # Load environment variables
 load_dotenv()
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
