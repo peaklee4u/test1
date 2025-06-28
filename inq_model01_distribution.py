@@ -210,24 +210,22 @@ def page_3():
     st.title("탐구 도우미 활용하기")
     st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
 
-    # 메시지 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
     if "clear_input" not in st.session_state:
         st.session_state["clear_input"] = False
 
-    # 입력창: 텍스트
+    # 질문 입력
     if st.session_state["clear_input"]:
         user_input = st.text_area("질문을 입력하세요:", value="", key="user_input_area")
         st.session_state["clear_input"] = False
     else:
         user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
-    # 파일 업로드: PDF 또는 이미지
+    # 파일 업로드 (pdf 또는 이미지)
     uploaded_file = st.file_uploader("📎 참고할 PDF 또는 이미지 파일을 업로드하세요:", type=["pdf", "png", "jpg", "jpeg"])
 
-    # 파일 처리 결과
     extracted_pdf_text = None
     encoded_image = None
 
@@ -241,44 +239,35 @@ def page_3():
         else:
             st.warning("지원하지 않는 파일 형식입니다.")
 
-    # 전송 버튼
     if st.button("전송"):
         if not user_input.strip() and not uploaded_file:
             st.warning("텍스트나 파일을 입력해주세요.")
-        else:
-            # 메시지 content 구성
-            content = []
-            if user_input.strip():
-                content.append({"type": "text", "text": user_input})
+            return
 
-            if encoded_image:
-                content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}})
-            elif extracted_pdf_text:
-                # system 메시지로 PDF 요약 포함
-                st.session_state["messages"].append({
-                    "role": "system",
-                    "content": f"학생이 참고한 PDF 문서의 주요 내용입니다:\n\n{extracted_pdf_text[:1500]}"
-                })
+        # 멀티모달 content 구성
+        content = []
+        if user_input.strip():
+            content.append({"type": "text", "text": user_input})
 
-            if len(content) == 1:
-              content = content[0]  # 하나일 경우에는 content만 꺼냄
-              st.session_state["messages"].append({"role": "user", "content": content})
-            else:
-              # GPT-4o만 복합 content 형식 지원
-              if MODEL != "gpt-4o":
-                st.error("이미지와 텍스트를 함께 전송하려면 GPT-4o 모델을 사용해야 합니다.")
-                return
-              st.session_state["messages"].append({"role": "user", "content": content})
- 
+        if encoded_image:
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}})
+        elif extracted_pdf_text:
+            # PDF 텍스트는 별도 system 메시지로
+            st.session_state["messages"].append({
+                "role": "system",
+                "content": f"학생이 참고한 PDF 문서 내용입니다:\n\n{extracted_pdf_text[:1500]}"
+            })
 
-            # 메시지 추가 및 응답
-            st.session_state["messages"].append({"role": "user", "content": content})
-            get_chatgpt_response(content)
+        # content 타입 정리 후 저장
+        if len(content) == 1:
+            content = content[0]
 
-            st.session_state["clear_input"] = True
-            st.rerun()
+        st.session_state["messages"].append({"role": "user", "content": content})
+        get_chatgpt_response(content)
+        st.session_state["clear_input"] = True
+        st.rerun()
 
-    # 최근 대화 출력
+    # 최근 대화
     if st.session_state["messages"]:
         st.subheader("📌 최근 대화")
         last_messages = st.session_state["messages"][-2:]
@@ -314,11 +303,9 @@ def page_3():
             st.markdown("**과학탐구 도우미:**")
             st.write(msg["content"])
 
-    # 다음 단계로 이동
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
-
 
 # Page 4: Save and summarize
 def page_4():
