@@ -199,9 +199,14 @@ def page_3():
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    # 초기화 플래그
     if "clear_input" not in st.session_state:
         st.session_state["clear_input"] = False
+
+    # PDF 업로드 및 텍스트 추출
+    pdf_file = st.file_uploader("참고할 PDF 파일을 업로드하세요 (선택사항):", type=["pdf"])
+    if pdf_file and "pdf_text" not in st.session_state:
+        st.session_state["pdf_text"] = extract_pdf_text(pdf_file)
+        st.success("PDF에서 텍스트를 성공적으로 불러왔어요!")
 
     # 입력창: 텍스트
     if st.session_state["clear_input"]:
@@ -210,7 +215,7 @@ def page_3():
     else:
         user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
-    # 입력창: 이미지 (선택사항)
+    # 이미지 업로드 (선택사항)
     uploaded_image = st.file_uploader("참고 이미지(선택사항)를 업로드하세요:", type=["png", "jpg", "jpeg"])
 
     # 전송 버튼
@@ -228,20 +233,25 @@ def page_3():
             else:
                 content = user_input
 
+            # 📘 시스템 프롬프트에 PDF 내용 포함 (필요할 때만)
+            if "pdf_text" in st.session_state:
+                pdf_context = st.session_state["pdf_text"][:1500]  # 너무 길면 자릅니다
+                st.session_state["messages"].append({
+                    "role": "system",
+                    "content": f"참고 문서 내용:\n{pdf_context}"
+                })
+
             # 메시지 추가 및 응답
             st.session_state["messages"].append({"role": "user", "content": content})
             get_chatgpt_response(content)
 
-            # 👉 입력창 초기화용 플래그 설정
             st.session_state["clear_input"] = True
-
-            # 리렌더링
             st.rerun()
 
     # 최근 대화 출력
     if st.session_state["messages"]:
         st.subheader("📌 최근 대화")
-        last_messages = st.session_state["messages"][-2:]  # 사용자-응답 페어
+        last_messages = st.session_state["messages"][-2:]
         for msg in last_messages:
             if msg["role"] == "user":
                 st.markdown("**You:**")
@@ -274,10 +284,11 @@ def page_3():
             st.markdown("**과학탐구 도우미:**")
             st.write(msg["content"])
 
-    # 다음 단계로 이동
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
+
+
 
 # Page 4: Save and summarize
 def page_4():
