@@ -7,6 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import base64
 import pymysql
+import fitz  # PyMuPDF
  
 # Load environment variables
 load_dotenv()
@@ -148,6 +149,18 @@ def save_to_db(all_data):
     except Exception as e:
         st.error(f"알 수 없는 오류가 발생했습니다: {e}")
         return False
+
+
+# pdf extract
+def extract_pdf_text(file):
+    doc = fitz.open(stream=file.read(), filetype="pdf")
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    return text
+
+
+
 
 # Page 1: User info input
 def page_1():
