@@ -103,9 +103,11 @@ def encode_image(uploaded_file):
 
 # Generate response from OpenAI
 def get_chatgpt_response(content):
+    messages = [{"role": "system", "content": initial_prompt}] + st.session_state["messages"]
+
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[{"role": "system", "content": initial_prompt}] + st.session_state["messages"] + [{"role": "user", "content": content}]
+        messages=messages,
     )
     answer = response.choices[0].message.content
     st.session_state["messages"].append({"role": "assistant", "content": answer})
@@ -259,7 +261,15 @@ def page_3():
                 })
 
             if len(content) == 1:
-                content = content[0]  # 단일 텍스트/이미지만 있을 경우 list 아님
+              content = content[0]  # 하나일 경우에는 content만 꺼냄
+              st.session_state["messages"].append({"role": "user", "content": content})
+            else:
+              # GPT-4o만 복합 content 형식 지원
+              if MODEL != "gpt-4o":
+                st.error("이미지와 텍스트를 함께 전송하려면 GPT-4o 모델을 사용해야 합니다.")
+                return
+              st.session_state["messages"].append({"role": "user", "content": content})
+ 
 
             # 메시지 추가 및 응답
             st.session_state["messages"].append({"role": "user", "content": content})
