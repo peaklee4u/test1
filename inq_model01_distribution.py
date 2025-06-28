@@ -103,15 +103,32 @@ def encode_image(uploaded_file):
 
 # Generate response from OpenAI
 def get_chatgpt_response(content):
+    # 메시지 쌓기
     messages = [{"role": "system", "content": initial_prompt}] + st.session_state["messages"]
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-    )
-    answer = response.choices[0].message.content
-    st.session_state["messages"].append({"role": "assistant", "content": answer})
-    return answer
+    # content가 list일 경우: 멀티모달 메시지 (text + image)
+    if isinstance(content, list):
+        if MODEL != "gpt-4o":
+            st.error("이미지와 함께 질문하려면 모델을 'gpt-4o'로 설정해야 합니다.")
+            return None
+        messages.append({"role": "user", "content": content})
+    else:
+        messages.append({"role": "user", "content": content})
+
+    # GPT 호출
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages
+        )
+        answer = response.choices[0].message.content
+        st.session_state["messages"].append({"role": "assistant", "content": answer})
+        return answer
+
+    except openai.BadRequestError as e:
+        st.error("OpenAI 요청 오류: 메시지 형식 또는 데이터가 잘못됐습니다.")
+        return None
+     
 
 # Save to MySQL database
 def save_to_db(all_data):
