@@ -128,6 +128,9 @@ def get_chatgpt_response(content, pdf_context=None):
         st.session_state["messages"].append({"role": "user", "content": content})
         st.session_state["messages"].append({"role": "assistant", "content": answer})
         
+        # 최근 대화 저장
+        st.session_state["recent_message"] = {"user": content, "assistant": answer}
+        
         return answer
     except Exception as e:
         st.error(f"❌ ChatGPT 응답 오류: {e}")
@@ -182,6 +185,22 @@ def extract_pdf_text(file):
         text += page.get_text()
     return text
 
+# 콘텐츠 표시 헬퍼 함수
+def display_content(content):
+    if isinstance(content, list):
+        for part in content:
+            if part.get("type") == "text":
+                st.write(part.get("text", ""))
+            elif part.get("type") == "image_url":
+                st.image(part["image_url"]["url"], caption="업로드한 이미지")
+    elif isinstance(content, dict):
+        if content.get("type") == "text":
+            st.write(content.get("text", ""))
+        elif content.get("type") == "image_url":
+            st.image(content["image_url"]["url"], caption="업로드한 이미지")
+    else:
+        st.write(content)
+
 
 # Page 1: User info input
 def page_1():
@@ -219,12 +238,21 @@ def page_2():
     
     ⑤ 충분히 대화가 이루어지면 인공지능이 [다음] 버튼을 눌러도 된다고 알려줘요.
     """)
-    if st.button("다음"):
-        st.session_state["step"] = 3
-        st.rerun()
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("이전"):
+            st.session_state["step"] = 1
+            st.rerun()
+            
+    with col2:
+        if st.button("다음"):
+            st.session_state["step"] = 3
+            st.rerun()
 
 
-# Page 3: Chat interface with optional image upload - 수정된 함수
+# Page 3: Chat interface with Form
 def page_3():
     st.title("탐구 도우미 활용하기")
     st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
@@ -232,11 +260,18 @@ def page_3():
     # 세션 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
+    
+    if "recent_message" not in st.session_state:
+        st.session_state["recent_message"] = {"user": "", "assistant": ""}
 
-    # 입력창 - key를 사용하여 고유하게 관리
-    user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
-
-    # 파일 업로드
+    # Form을 사용하여 입력창 관리
+    with st.form(key="chat_form", clear_on_submit=True):
+        user_input = st.text_area("You: ", height=100, placeholder="질문을 입력하세요...")
+        
+        # 전송 버튼
+        submit_button = st.form_submit_button("전송")
+    
+    # 파일 업로드는 form 밖에서 처리
     uploaded_file = st.file_uploader("📎 참고할 PDF 또는 이미지 파일을 업로드하세요:", type=["pdf", "png", "jpg", "jpeg"])
 
     extracted_pdf_text = None
@@ -252,12 +287,8 @@ def page_3():
         else:
             st.warning("지원하지 않는 파일 형식입니다.")
 
-    # 전송 버튼
-    if st.button("전송", key="send_button"):
-        if not user_input.strip() and not uploaded_file:
-            st.warning("텍스트나 파일을 입력해주세요.")
-            return
-
+    # Form submit 처리
+    if submit_button and user_input.strip():
         # 콘텐츠 구성
         if encoded_image:
             # 이미지가 있는 경우 멀티모달 형식
@@ -276,80 +307,87 @@ def page_3():
             st.rerun()  # 응답 후 페이지 새로고침
 
     # 최근 대화 표시
-    if st.session_state["messages"]:
-        st.subheader("📌 최근 대화")
-        # 최근 2개 메시지만 표시
-        recent_messages = st.session_state["messages"][-4:]  # 사용자 + 어시스턴트 각각 최대 2개씩
-        
-        for msg in recent_messages:
-            if msg["role"] == "user":
-                st.markdown("**You:**")
-                display_content(msg["content"])
-            elif msg["role"] == "assistant":
-                st.markdown("**과학탐구 도우미:**")
-                st.write(msg["content"])
-
-    # 누적 대화
-    if len(st.session_state["messages"]) > 4:
-        with st.expander("📜 전체 대화 보기"):
-            for msg in st.session_state["messages"]:
-                if msg["role"] == "user":
-                    st.markdown("**You:**")
-                    display_content(msg["content"])
-                elif msg["role"] == "assistant":
-                    st.markdown("**과학탐구 도우미:**")
-                    st.write(msg["content"])
-
-    # 다음 단계로 이동
-    if st.button("다음", key="next_step_button"):
-        st.session_state["step"] = 4
-        st.rerun()
-
-# 콘텐츠 표시 헬퍼 함수
-def display_content(content):
-    if isinstance(content, list):
-        for part in content:
-            if part.get("type") == "text":
-                st.write(part.get("text", ""))
-            elif part.get("type") == "image_url":
-                st.image(part["image_url"]["url"], caption="업로드한 이미지")
-    elif isinstance(content, dict):
-        if content.get("type") == "text":
-            st.write(content.get("text", ""))
-        elif content.get("type") == "image_url":
-            st.image(content["image_url"]["url"], caption="업로드한 이미지")
+    st.subheader("📌 최근 대화")
+    if st.session_state["recent_message"]["user"] or st.session_state["recent_message"]["assistant"]:
+        st.write(f"**You:** {st.session_state['recent_message']['user']}")
+        st.write(f"**과학탐구 도우미:** {st.session_state['recent_message']['assistant']}")
     else:
-        st.write(content)
+        st.write("아직 최근 대화가 없습니다.")
+
+    # 누적 대화 표시
+    st.subheader("📜 누적 대화 목록")
+    if st.session_state["messages"]:
+        for message in st.session_state["messages"]:
+            if message["role"] == "user":
+                st.write(f"**You:** {message['content']}")
+            elif message["role"] == "assistant":
+                st.write(f"**과학탐구 도우미:** {message['content']}")
+    else:
+        st.write("아직 대화 기록이 없습니다.")
+
+    # 이전/다음 버튼
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("이전"):
+            st.session_state["step"] = 2
+            st.rerun()
+            
+    with col2:
+        if st.button("다음"):
+            st.session_state["step"] = 4
+            st.session_state["feedback_saved"] = False  # 피드백 재생성 플래그 초기화
+            st.rerun()
 
 
 # Page 4: Save and summarize
 def page_4():
     st.title("탐구 도우미의 제안")
+    st.write("탐구 도우미가 대화 내용을 정리 중입니다. 잠시만 기다려주세요.")
     
-    if not st.session_state.get("summary_generated", False):
+    # 페이지 4로 돌아올 때마다 새로운 피드백 생성
+    if not st.session_state.get("feedback_saved", False):
         try:
-            chat_history = "\n".join(
-                json.dumps(m, ensure_ascii=False) for m in st.session_state["messages"]
-            )
-            prompt = f"학생과의 대화 기록: {chat_history}\n\n위 대화를 요약하고 피드백을 제공하세요."
+            # 대화 기록을 기반으로 탐구 계획 작성
+            chat_history = "\n".join(f"{msg['role']}: {msg['content']}" for msg in st.session_state["messages"])
+            prompt = f"다음은 학생과 과학탐구 도우미의 대화 기록입니다:\n{chat_history}\n\n"
+            prompt += "[다음] 버튼을 눌러도 된다는 대화가 포함되어 있는지 확인하세요. 포함되지 않았다면, '[이전] 버튼을 눌러 과학탐구 도우미와 더 대화해야 합니다'라고 출력하세요. [다음] 버튼을 누르라는 대화가 포함되었음에도 이를 인지하지 못하는 경우가 많으므로, 대화를 철저히 확인하세요. 대화 기록에 [다음] 버튼을 눌러도 된다는 대화가 포함되었다면, 대화 기록을 바탕으로, 다음 내용을 포함해 탐구 내용과 피드백을 작성하세요: 1. 대화 내용 요약(대화에서 실험의 어떤 부분을 어떻게 수정하기로 했는지를 중심으로 빠뜨리는 내용 없이 요약해 주세요. 가독성이 좋도록 줄바꿈 하세요.) 2. 학생의 탐구 능력에 관한 피드백, 3. 예상 결과(주제와 관련된 과학적 이론과 실험 오차를 고려해, 실험 과정을 그대로 수행했을 때 나올 실험 결과를 표 등으로 제시해주세요. 이때 결과 관련 설명은 제시하지 말고, 결과만 제시하세요)."
             
+            # OpenAI API 호출
             response = client.chat.completions.create(
                 model=MODEL,
                 messages=[{"role": "system", "content": prompt}]
             )
-            summary = response.choices[0].message.content
-            st.session_state["summary"] = summary
-            st.session_state["summary_generated"] = True
-            
-            # 데이터베이스에 저장
-            save_to_db(st.session_state["messages"] + [{"role": "assistant", "content": summary}])
+            st.session_state["experiment_plan"] = response.choices[0].message.content
             
         except Exception as e:
-            st.error(f"요약 생성 중 오류가 발생했습니다: {e}")
-            st.session_state["summary"] = "요약을 생성할 수 없습니다."
+            st.error(f"피드백 생성 중 오류가 발생했습니다: {e}")
+            st.session_state["experiment_plan"] = "피드백을 생성할 수 없습니다."
 
-    st.write(st.session_state.get("summary", "요약 없음"))
+    # 피드백 출력
+    st.subheader("📋 생성된 피드백")
+    st.write(st.session_state["experiment_plan"])
 
+    # 대화 내용과 피드백을 통합하여 데이터베이스에 저장
+    if not st.session_state.get("feedback_saved", False):
+        all_data_to_store = st.session_state["messages"] + [{"role": "assistant", "content": st.session_state["experiment_plan"]}]
+        
+        # MySQL에 저장
+        if save_to_db(all_data_to_store):
+            st.session_state["feedback_saved"] = True  # 저장 성공 시 플래그 설정
+            st.success("데이터가 성공적으로 저장되었습니다.")
+        else:
+            st.error("저장에 실패했습니다. 다시 시도해주세요.")
+
+    # 이전 버튼 (페이지 3으로 이동 시 피드백 삭제)
+    if st.button("이전"):
+        st.session_state["step"] = 3
+        if "experiment_plan" in st.session_state:
+            del st.session_state["experiment_plan"]  # 피드백 삭제
+        st.session_state["feedback_saved"] = False  # 피드백 재생성 플래그 초기화
+        st.rerun()
+
+    # 처음으로 돌아가기 버튼
     if st.button("처음으로"):
         # 세션 초기화
         for key in list(st.session_state.keys()):
