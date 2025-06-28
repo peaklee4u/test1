@@ -199,12 +199,9 @@ def page_3():
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    if "user_input" not in st.session_state:
-        st.session_state["user_input"] = ""
-
     
     # 입력창: 텍스트
-    user_input = st.text_area("질문을 입력하세요:", value=st.session_state["user_input"], key="user_input_area")
+    user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
     # 입력창: 이미지 (선택사항)
     uploaded_image = st.file_uploader("참고 이미지(선택사항)를 업로드하세요:", type=["png", "jpg", "jpeg"])
@@ -228,9 +225,7 @@ def page_3():
             st.session_state["messages"].append({"role": "user", "content": content})
             answer = get_chatgpt_response(content)
 
-            # 입력창 초기화
-            st.session_state["user_input"] = ""
-
+ 
             # 화면 갱신
             st.rerun()
 
