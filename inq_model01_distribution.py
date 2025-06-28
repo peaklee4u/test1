@@ -229,21 +229,21 @@ def page_3():
     st.title("탐구 도우미 활용하기")
     st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
 
-    # 초기 세션 상태 설정
+    # 세션 상태 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
     if "clear_input" not in st.session_state:
         st.session_state["clear_input"] = False
 
-    # 질문 입력창
+    # 입력창
     if st.session_state["clear_input"]:
         user_input = st.text_area("질문을 입력하세요:", value="", key="user_input_area")
         st.session_state["clear_input"] = False
     else:
         user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
-    # PDF 또는 이미지 파일 업로드
+    # 파일 업로더: PDF 또는 이미지
     uploaded_file = st.file_uploader("📎 참고할 PDF 또는 이미지 파일을 업로드하세요:", type=["pdf", "png", "jpg", "jpeg"])
 
     extracted_pdf_text = None
@@ -265,7 +265,6 @@ def page_3():
             st.warning("텍스트나 파일을 입력해주세요.")
             return
 
-        # 메시지 content 구성
         content = []
         if user_input.strip():
             content.append({"type": "text", "text": user_input})
@@ -278,21 +277,42 @@ def page_3():
                 "content": f"학생이 참고한 PDF 문서 내용입니다:\n\n{extracted_pdf_text[:1500]}"
             })
 
-        # 단일 content라면 dict로 전달
         if len(content) == 1:
-            content = content[0]
+            content = content[0]  # 단일 텍스트만 있는 경우
 
         st.session_state["messages"].append({"role": "user", "content": content})
         get_chatgpt_response(content)
         st.session_state["clear_input"] = True
         st.rerun()
 
-   # 최근 대화 출력 (user + assistant 반드시 쌍으로 출력)
-if st.session_state["messages"]:
-    st.subheader("📌 최근 대화")
-    recent_msgs = st.session_state["messages"][-2:]  # 마지막 2개 메시지 (user, assistant)
+    # 최근 대화 출력
+    if st.session_state["messages"]:
+        st.subheader("📌 최근 대화")
+        recent_msgs = st.session_state["messages"][-2:]
+        for msg in recent_msgs:
+            if msg["role"] == "user":
+                st.markdown("**You:**")
+                content = msg["content"]
+                if isinstance(content, list):
+                    for part in content:
+                        if part.get("type") == "text":
+                            st.write(part.get("text", ""))
+                        elif part.get("type") == "image_url":
+                            st.image(part["image_url"]["url"], caption="업로드한 이미지")
+                elif isinstance(content, dict):
+                    if content.get("type") == "text":
+                        st.write(content.get("text", ""))
+                    elif content.get("type") == "image_url":
+                        st.image(content["image_url"]["url"], caption="업로드한 이미지")
+                else:
+                    st.write(content)
+            elif msg["role"] == "assistant":
+                st.markdown("**과학탐구 도우미:**")
+                st.write(msg["content"])
 
-    for msg in recent_msgs:
+    # 전체 대화 출력
+    st.subheader("📜 누적 대화")
+    for msg in st.session_state["messages"]:
         if msg["role"] == "user":
             st.markdown("**You:**")
             content = msg["content"]
@@ -309,34 +329,11 @@ if st.session_state["messages"]:
                     st.image(content["image_url"]["url"], caption="업로드한 이미지")
             else:
                 st.write(content)
-
         elif msg["role"] == "assistant":
             st.markdown("**과학탐구 도우미:**")
             st.write(msg["content"])
 
-    # 전체 대화 출력
-    st.subheader("📜 누적 대화")
-    for msg in st.session_state["messages"]:
-        if msg["role"] == "user":
-            st.markdown("**You:**")
-            content = msg["content"]
-            if isinstance(content, list):
-                for part in content:
-                    if part["type"] == "text":
-                        st.write(part["text"])
-                    elif part["type"] == "image_url":
-                        st.image(part["image_url"]["url"], caption="업로드한 이미지")
-            elif isinstance(content, dict):
-                if content.get("type") == "text":
-                    st.write(content.get("text", ""))
-                elif content.get("type") == "image_url":
-                    st.image(content["image_url"]["url"], caption="업로드한 이미지")
-            else:
-                st.write(content)
-        elif msg["role"] == "assistant":
-            st.markdown("**과학탐구 도우미:**")
-            st.write(msg["content"])
-
+    # 다음 버튼
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
