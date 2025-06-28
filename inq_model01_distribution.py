@@ -195,11 +195,10 @@ def page_3():
     st.title("탐구 도우미 활용하기")
     st.write("탐구 도우미와 대화를 나누며 탐구를 설계하세요.")
 
-    # 초기화
+    # 메시지 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    
     # 입력창: 텍스트
     user_input = st.text_area("질문을 입력하세요:", key="user_input_area")
 
@@ -225,7 +224,9 @@ def page_3():
             st.session_state["messages"].append({"role": "user", "content": content})
             answer = get_chatgpt_response(content)
 
- 
+            # 👉 입력창 비우기
+            st.session_state["user_input_area"] = ""
+
             # 화면 갱신
             st.rerun()
 
@@ -269,7 +270,6 @@ def page_3():
     if st.button("다음"):
         st.session_state["step"] = 4
         st.rerun()
-
 
 
 # Page 4: Save and summarize
