@@ -235,7 +235,7 @@ def page_2():
 # Page 3: Chat interface with Form
 def page_3():
     st.title("탐구 분석 도우미 활용하기")
-    st.write("탐구 분석 도우미와 대화를 나누며 탐구를 설계하세요.")
+    st.write("탐구 분석 도우미와 대화를 나누며 탐구 보고서를 작성하세요.")
 
     # 세션 초기화
     if "messages" not in st.session_state:
