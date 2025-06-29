@@ -169,6 +169,15 @@ def display_content(content):
         else:
             st.write(content)
 
+# app 제목 표시
+st.set_page_config(
+    page_title="나의 과학탐구 분석 도우미",  # 원하는 제목
+    page_icon="🔬",  # 선택사항: 이모지나 favicon
+    layout="wide",   # 선택사항: "centered" 또는 "wide"
+    initial_sidebar_state="expanded"  # 선택사항
+)
+
+
 
 # Page 1: User info input
 def page_1():
