@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import base64
 import pymysql
 import fitz  # PyMuPDF
-import docx
+
 
 # Load environment variables
 load_dotenv()
