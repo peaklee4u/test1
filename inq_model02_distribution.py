@@ -7,7 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import base64
 import pymysql
-from PyPDF2 import PdfReader
+import fitz  # PyMuPDF
 import docx
 
 # Load environment variables
