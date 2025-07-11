@@ -85,7 +85,7 @@ def get_chatgpt_response(content):
             model=MODEL,
             messages=[{"role": "system", "content": initial_prompt}] + st.session_state["messages"] + [{"role": "user", "content": content}]
         )
-        answer = response.choices[0].message["content"]
+        answer = response["choices"][0]["message"]["content"]
         st.session_state["messages"].append({"role": "assistant", "content": answer})
         return answer
     except Exception as e:
