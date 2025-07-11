@@ -1,6 +1,6 @@
 # Streamlit-based chatbot with file upload (text/PDF/DOCX) for scientific inquiry support
 import streamlit as st
-from openai import OpenAI
+import openai
 import os
 import json
 from datetime import datetime
@@ -12,19 +12,16 @@ import docx
 
 # Load environment variables
 load_dotenv()
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 MODEL = "gpt-4o"
 
-# Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-# Initial prompt (same as your original detailed instructions)
+# Initial prompt
 initial_prompt = (
-    "당신은 중학생의 자유 탐구 결과를 바탕으로 탐구보고서를 작성하도록 돕는 챗봇이며, 이름은 '탐구보고서 도우미'입니다."
+    "당신은 중학생의 자유 탐구를 바탕으로 탐구보고서를 작성하도록 돕는 챗봇이며, 이름은 '탐구보고서 도우미'입니다."
     "이 탐구는 중학교 1학년 학생들이 수행한 것이지만, 과학에 관심이 많은 학생들이므로 중학교 3학년 수준이라고 생각하고 설명하세요."
     "과학 개념을 설명할 때는 15세 수준에 맞춰 간단하고 명확하게 설명하세요."
 
-    "학생은 실험을 완료하고 결과(데이터표, 그래프, 관찰 결과 등)를 가지고 왔습니다. "
+    "학생은 실험을 완료하고 결과(데이터표, 그래프, 관찰 결과 등)를 가지고 왔습니다."
     "당신은 학생의 결과를 분석하고, 신뢰성, 경향성, 해석, 결론이 타당한지 평가해 피드백을 제공해야 합니다."
 
     "학생은 다음과 같은 절차로 챗봇을 활용하도록 안내되었습니다:"
@@ -68,7 +65,6 @@ def encode_image(uploaded_file):
 
 # Helper to read uploaded document
 @st.cache_data
-
 def read_uploaded_document(uploaded_file):
     file_type = uploaded_file.type
     if file_type == "text/plain":
@@ -76,25 +72,27 @@ def read_uploaded_document(uploaded_file):
     elif file_type == "application/pdf":
         pdf = PdfReader(uploaded_file)
         return "\n".join([page.extract_text() for page in pdf.pages if page.extract_text()])
-    elif file_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
+    elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         doc = docx.Document(uploaded_file)
         return "\n".join([para.text for para in doc.paragraphs])
     else:
         return None
 
 # Generate response from OpenAI
-
 def get_chatgpt_response(content):
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "system", "content": initial_prompt}] + st.session_state["messages"] + [{"role": "user", "content": content}]
-    )
-    answer = response.choices[0].message.content
-    st.session_state["messages"].append({"role": "assistant", "content": answer})
-    return answer
+    try:
+        response = openai.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": initial_prompt}] + st.session_state["messages"] + [{"role": "user", "content": content}]
+        )
+        answer = response.choices[0].message.content
+        st.session_state["messages"].append({"role": "assistant", "content": answer})
+        return answer
+    except Exception as e:
+        st.error(f"OpenAI API 오류: {e}")
+        return "오류가 발생했습니다. 다시 시도해주세요."
 
 # Save chat to DB
-
 def save_to_db(all_data):
     number = st.session_state.get('user_number', '').strip()
     name = st.session_state.get('user_name', '').strip()
@@ -127,10 +125,8 @@ def save_to_db(all_data):
         return False
 
 # Page 1: Input user info
-
 def page_1():
     st.title("과학탐구 도우미")
-    st.write("학번과 이름을 입력한 뒤 '다음' 버튼을 눌러주세요.")
     st.session_state["user_number"] = st.text_input("학번", value=st.session_state.get("user_number", ""))
     st.session_state["user_name"] = st.text_input("이름", value=st.session_state.get("user_name", ""))
     if st.button("다음"):
@@ -141,55 +137,36 @@ def page_1():
             st.rerun()
 
 # Page 2: Instruction
-
 def page_2():
     st.title("탐구 도우미 활용 방법")
-    st.write("""
-    탐구를 마친 후, 실험 결과를 분석하고 탐구보고서를 잘 작성할 수 있도록 인공지능이 도와줄 거예요.
+    st.markdown("""
+    ① 실험 결과(표, 그래프, 결론 등)를 챗봇에게 알려주세요.  
+    ② 챗봇은 피드백을 주고, 궁금한 점을 질문해 보세요.  
+    ③ '궁금한 건 다 물어봤어'라고 말하면 챗봇이 질문을 시작해요.  
+    ④ 대화가 끝나면 챗봇이 [다음] 버튼을 눌러도 된다고 알려줄 거예요.
+    """)
+    if st.button("다음"):
+        st.session_state["step"] = 3
+        st.rerun()
 
-    ① 먼저 인공지능에게 실험 결과(데이터 표, 그래프, 결론 등)를 알려주세요.
-    
-    ② 인공지능은 결과를 분석하고, 어떤 점이 잘 되었는지, 어떤 점을 더 보완하면 좋은지 알려줄 거예요.
-    
-    ③ 궁금한 점이 있다면 인공지능에게 자유롭게 질문해 보세요.
-    
-    ④ 궁금한 것이 다 해결되면, '궁금한 건 다 물어봤어'라고 말해 주세요.
-    
-    ⑤ 그러면 인공지능이 여러분에게 질문을 하며, 결론이나 보고서를 더 잘 쓸 수 있도록 도와줄 거예요.
-    
-    ⑥ 대화가 충분히 이루어지면 인공지능이 [다음] 버튼을 눌러도 된다고 말해줄 거예요. 인공지능이 그렇게 말했을 때 [다음] 버튼을 눌러주세요!
-     """)
-    
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        if st.button("이전"):
-            st.session_state["step"] = 1
-            st.rerun()
-            
-    with col2:
-        if st.button("다음"):
-            st.session_state["step"] = 3
-            st.rerun()
-
-# Page 3: Chat interface with file upload
-
+# Page 3: Chat interface
 def page_3():
-    st.title("탐구 도우미 활용하기")
+    st.title("탐구 도우미와 대화하기")
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
     if "user_input" not in st.session_state:
         st.session_state["user_input"] = ""
+
     user_input = st.text_area("질문을 입력하세요:", value=st.session_state["user_input"], key="user_input_area")
-    uploaded_file = st.file_uploader("탐구 계획서(텍스트, PDF, 워드) 업로드:", type=["txt", "pdf", "docx"])
-    uploaded_image = st.file_uploader("참고 이미지(선택):", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("탐구 결과 파일 업로드 (txt, pdf, docx):", type=["txt", "pdf", "docx"])
+    uploaded_image = st.file_uploader("참고 이미지 업로드 (선택):", type=["jpg", "jpeg", "png"])
 
     if st.button("전송"):
         content = ""
         if uploaded_file:
             file_content = read_uploaded_document(uploaded_file)
             if file_content:
-                content += f"[업로드된 탐구 계획서]\n{file_content}\n"
+                content += f"[탐구 결과 업로드]\n{file_content}\n"
             else:
                 st.warning("파일을 읽을 수 없습니다.")
 
@@ -197,7 +174,7 @@ def page_3():
             content += f"[사용자 입력]\n{user_input.strip()}"
 
         if not content:
-            st.warning("텍스트 또는 파일을 입력해주세요.")
+            st.warning("내용을 입력하거나 파일을 업로드하세요.")
             return
 
         if uploaded_image:
@@ -217,26 +194,21 @@ def page_3():
         for msg in st.session_state["messages"][-2:]:
             if msg["role"] == "user":
                 st.markdown("**You:**")
-                if isinstance(msg["content"], list):
-                    for part in msg["content"]:
-                        if part["type"] == "text":
-                            st.write(part["text"])
-                        elif part["type"] == "image_url":
-                            st.image(part["image_url"]["url"], caption="업로드한 이미지")
-                else:
-                    st.write(msg["content"])
+                st.write(msg["content"])
             elif msg["role"] == "assistant":
-                st.markdown("**과학탐구 도우미:**")
+                st.markdown("**탐구 도우미:**")
                 st.write(msg["content"])
 
 # Page 4: Summarize
-
 def page_4():
-    st.title("탐구 도우미의 제안")
-    if not st.session_state.get("summary_generated"):
+    st.title("탐구 도우미의 제안 요약")
+    if "summary_generated" not in st.session_state:
+        st.session_state["summary_generated"] = False
+
+    if not st.session_state["summary_generated"]:
         chat_history = "\n".join(json.dumps(m, ensure_ascii=False) for m in st.session_state["messages"])
-        prompt = f"학생과의 대화 기록: {chat_history}\n\n위 대화를 요약하고 피드백을 제공하세요."
-        response = client.chat.completions.create(
+        prompt = f"학생과의 대화 기록: {chat_history}\n\n이 대화를 요약하고 피드백을 제공하세요."
+        response = openai.chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": prompt}]
         )
@@ -244,6 +216,7 @@ def page_4():
         st.session_state["summary"] = summary
         st.session_state["summary_generated"] = True
         save_to_db(st.session_state["messages"] + [{"role": "assistant", "content": summary}])
+
     st.write(st.session_state.get("summary", "요약 없음"))
     if st.button("처음으로"):
         st.session_state.clear()
@@ -252,6 +225,7 @@ def page_4():
 # Main logic
 if "step" not in st.session_state:
     st.session_state["step"] = 1
+
 if st.session_state["step"] == 1:
     page_1()
 elif st.session_state["step"] == 2:
