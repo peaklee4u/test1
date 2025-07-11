@@ -81,16 +81,18 @@ def read_uploaded_document(uploaded_file):
 # Generate response from OpenAI
 def get_chatgpt_response(content):
     try:
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model=MODEL,
             messages=[{"role": "system", "content": initial_prompt}] + st.session_state["messages"] + [{"role": "user", "content": content}]
         )
-        answer = response.choices[0].message.content
+        answer = response.choices[0].message["content"]
         st.session_state["messages"].append({"role": "assistant", "content": answer})
         return answer
     except Exception as e:
         st.error(f"OpenAI API 오류: {e}")
         return "오류가 발생했습니다. 다시 시도해주세요."
+
+
 
 # Save chat to DB
 def save_to_db(all_data):
